@@ -20,7 +20,7 @@
     "test:integration": "node server/test-integration.js",
     "migrate:custom-print": "node server/migrate-custom-print.js",
     "seed:custom-demo": "node server/seed-custom-demo.js",
-    "test:custom-unit": "node --test server/test-custom-unit.js server/test-cart-identity.mjs server/test-remediation-unit.js",
+    "test:custom-unit": "node --test server/test-custom-unit.js server/test-cart-identity.mjs server/test-remediation-unit.js server/test-locations-unit.js",
     "media:gc": "node server/media-gc.js",
     "test:browser": "node server/test-browser.js",
     "test:replica": "node server/test-replica.js",

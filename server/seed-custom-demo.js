@@ -19,7 +19,7 @@ async function seedDemo(){
     const requestKey=`demo-custom-v1-${target}`;if(db.orders.all().some(o=>o.requestKey===requestKey))continue;
     const items=[{productId:p.id,variantId:variant.id,itemType:'custom',designRevisionId:design.revisionId,qty:1,qualityAcknowledged:true}];
     const quote=response();await orders.postQuote({user:buyer,body:{items}},quote);
-    const res=response();await orders.post({user:buyer,body:{items,acceptedTotal:quote.value.total,requestKey,payMethod:'cod',address:{fullName:'Khách demo — không giao thật',phone:'0901234567',province:'Demo',district:'Demo',ward:'Demo',line1:'Địa chỉ minh họa lớp học'}}},res);
+    const res=response();await orders.post({user:buyer,body:{items,acceptedTotal:quote.value.total,requestKey,payMethod:'cod',address:{fullName:'Khách demo — không giao thật',phone:'0901234567',provinceCode:'01',wardCode:'00004',line1:'Địa chỉ minh họa lớp học'}}},res);
     const order=db.orders.byId(res.value.id);order.demo=true;
     const change=async status=>admin.putOrdersIdStatus({user:staff,params:{id:order.id},body:{status,note:'Mốc minh họa lớp học — không có giao dịch/vận chuyển thật'}},response());
     const job=cp.jobs(order)[0];

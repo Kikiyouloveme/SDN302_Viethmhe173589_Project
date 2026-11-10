@@ -45,7 +45,7 @@ async function main(){
   const quote=await expect('TC10–12 hai mẫu và hàng thường, bỏ qua giá client','POST','/api/orders/quote',{items:[item(design),item(second),{productId:product.id,variantId:variant.id,qty:1}],frontFee:-999});
   check('Tổng giá server đúng',()=>assert.equal(quote.subtotal,product.price*3+49000*2+69000));assert.equal(new Set(quote.items.map(i=>i.lineId)).size,3);
   const voucher=await expect('TC14 voucher tương thích','POST','/api/orders/quote',{items:[item(design)],voucherCode:'WELCOME10'});assert.equal(voucher.discount,Math.floor(voucher.subtotal*.1));
-  const address={fullName:'Khách Kiểm Thử',phone:'0901234567',province:'HCM',district:'Q1',ward:'P1',line1:'1 Demo Test'};
+  const address={fullName:'Khách Kiểm Thử',phone:'0901234567',provinceCode: '01', wardCode: '00004',line1:'1 Demo Test'};
   async function place(d,payMethod='cod'){const items=[item(d)];const q=(await call('POST','/api/orders/quote',{items})).body;const body={items,address,payMethod,acceptedTotal:q.total,requestKey:crypto.randomUUID()};const order=await expect('Tạo đơn custom','POST','/api/orders',body,201);return {order,body};}
   const {order,body}=await place(design);
   const retry=await expect('Checkout retry không trừ kho lần hai','POST','/api/orders',body);assert.equal(retry.id,order.id);

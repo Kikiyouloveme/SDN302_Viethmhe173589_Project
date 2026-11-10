@@ -43,7 +43,7 @@ async function main() {
   assert.equal(scarce.status, 201);
   const orderBody = {
     items: [{ productId: scarce.data.id, variantId: scarce.data.variants[0].id, qty: 1 }],
-    address: { fullName: 'Khách Kiểm Thử', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+    address: { fullName: 'Khách Kiểm Thử', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
     payMethod: 'cod',
   };
   const attempts = await Promise.all(Array.from({ length: 5 }, () => call('POST', '/api/orders', orderBody, admin)));

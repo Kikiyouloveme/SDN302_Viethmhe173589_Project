@@ -153,7 +153,7 @@ const getLocations = (_req, res) => {
 };
 
 const getLocationsCodeWards = (req, res, next) => {
-  const province = provinces.find((p) => String(p.code) === req.params.code);
+  const province = provinces.find((p) => p.code === require('../checkout-validation').code(req.params.code, 2));
   if (!province) return next(badRequest('Tỉnh/thành không hợp lệ'));
   res.json(province.wards.map(({ code, name }) => ({ code, name })));
 };
@@ -238,6 +238,7 @@ const post = async (req, res) => {
   let shippingAddress;
   if (guest) {
     if (req.body.addressId) throw badRequest('Vui lòng nhập địa chỉ giao hàng');
+    validateContact({ ...req.body.address, email: customerEmail });
     shippingAddress = validateAddress({ ...req.body.address, email: customerEmail });
   } else if (req.body.addressId) {
     const saved = (req.user.addresses || []).find((a) => a.id === req.body.addressId);
@@ -245,16 +246,7 @@ const post = async (req, res) => {
     shippingAddress = { ...saved };
     delete shippingAddress.isDefault;
   } else {
-    const a = req.body.address || {};
-    shippingAddress = {
-      fullName: v.str(a.fullName, 'họ tên người nhận', { min: 2, max: 80 }),
-      phone: v.phone(a.phone),
-      province: v.str(a.province, 'Tỉnh/Thành phố', { max: 100 }),
-      district: v.str(a.district, 'Quận/Huyện', { max: 100 }),
-      ward: v.str(a.ward, 'Phường/Xã', { max: 100 }),
-      line1: v.str(a.line1, 'địa chỉ chi tiết', { min: 3, max: 200 }),
-      note: v.str(a.note, 'ghi chú', { required: false, max: 200 }),
-    };
+    shippingAddress = validateAddress(req.body.address);
   }
 
   // Server dựng lại dòng hàng và tính tiền — bỏ qua hoàn toàn số liệu client gửi lên

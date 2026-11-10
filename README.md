@@ -107,7 +107,6 @@ Bỏ qua lớp giao diện cũng không truy cập được dữ liệu vì API 
 - **Thanh toán:** COD hoặc VNPay. Khách đăng nhập cần xác minh email; checkout khách vãng lai dùng OTP riêng và chỉ hỗ trợ COD.
 - **Phí vận chuyển:** 40.000₫, miễn phí khi giá trị đơn **sau khi trừ voucher** đạt 750.000₫.
 - **Voucher:** chỉ giảm theo phần trăm, tối đa 1 mã mỗi đơn, áp dụng được cho cả hàng đang sale.
-- **Tồn kho:** riêng cho từng tổ hợp màu + size.
 - **Hủy đơn:** khách tự hủy được cho tới trước khi đơn bàn giao đơn vị vận chuyển.
 - **Đổi/trả:** trong 7 ngày kể từ khi giao thành công, hàng còn nguyên tem và chưa sử dụng,
   bắt buộc có lý do + ảnh minh chứng, nhân viên duyệt thủ công.

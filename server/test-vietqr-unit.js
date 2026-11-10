@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 // Cấu hình tài khoản nhận thử nghiệm trước khi nạp module
 process.env.VIETQR_BANK_BIN = '970422';
 process.env.VIETQR_ACCOUNT_NO = 'VQRQANLS5394';
-process.env.VIETQR_ACCOUNT_NAME = 'NGUYEN LE NGOC HA';
+process.env.VIETQR_ACCOUNT_NAME = 'Hoang Minh Viet';
 
 const vietqr = require('./vietqr');
 

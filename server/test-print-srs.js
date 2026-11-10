@@ -66,7 +66,7 @@ async function main(){
   const customerDesign=await call('Customer SRS saved','POST','/api/designs',body,201,buyer);
   const mixedItems=[{...item(customerDesign),qty:1},{productId:product.id,variantId:variant.id,qty:1}];
   const mixedQuote=await call('TC24 mixed normal fee zero','POST','/api/orders/quote',{items:mixedItems},200,buyer);assert.equal(mixedQuote.items[1].printFee,0);
-  const mixed=await call('TC27 mixed order','POST','/api/orders',{items:mixedItems,acceptedTotal:mixedQuote.total,requestKey:crypto.randomUUID(),payMethod:'cod',address:{fullName:'Mixed Test',phone:'0901234567',province:'HCM',district:'Q1',ward:'P1',line1:'1 Demo'}},201,buyer);
+  const mixed=await call('TC27 mixed order','POST','/api/orders',{items:mixedItems,acceptedTotal:mixedQuote.total,requestKey:crypto.randomUUID(),payMethod:'cod',address:{fullName:'Mixed Test',phone:'0901234567',provinceCode: '01', wardCode: '00004',line1:'1 Demo'}},201,buyer);
   await call('Mixed COD confirm','PUT',`/api/admin/orders/${mixed.id}/status`,{status:'confirmed'},200,staff);
   const mixedJob=(await call('Mixed jobs','GET',`/api/orders/${mixed.id}/print-proofs`,null,200,buyer))[0];
   await call('Customer cannot approve','POST',`/api/admin/print-jobs/${mixedJob.id}/review`,{decision:'approve'},403,buyer);
@@ -78,7 +78,7 @@ async function main(){
 
   /* ---- VietQR POS ---- */
   const qrQuote=await call('VietQR quote','POST','/api/orders/quote',{items:[{...item(customerDesign),qty:1}]},200,buyer);
-  const qrOrder=await call('VietQR order create','POST','/api/orders',{items:[{...item(customerDesign),qty:1}],acceptedTotal:qrQuote.total,requestKey:crypto.randomUUID(),payMethod:'vietqr',address:{fullName:'QR Test',phone:'0901234567',province:'HCM',district:'Q1',ward:'P1',line1:'1 Demo'}},201,buyer);
+  const qrOrder=await call('VietQR order create','POST','/api/orders',{items:[{...item(customerDesign),qty:1}],acceptedTotal:qrQuote.total,requestKey:crypto.randomUUID(),payMethod:'vietqr',address:{fullName:'QR Test',phone:'0901234567',provinceCode: '01', wardCode: '00004',line1:'1 Demo'}},201,buyer);
   assert.equal(qrOrder.payMethod,'vietqr');assert.equal(qrOrder.payStatus,'pending');
   const qr=await call('VietQR QR generated','POST','/api/payment/vietqr/create',{orderId:qrOrder.id},200,buyer);
   assert.equal(qr.amount,qrOrder.total);assert.equal(qr.content,qrOrder.id.toUpperCase());assert.match(qr.image,/^data:image\/png;base64,/);

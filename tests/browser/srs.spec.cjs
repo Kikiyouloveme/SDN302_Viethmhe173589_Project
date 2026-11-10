@@ -18,12 +18,18 @@ test('SRS Guest three positions → OTP checkout → review → DONE',async({pag
   const item=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('vela_cart:guest'))[0]);expect(item.img).toContain('/preview');
   await page.goto('/checkout');await expect(page.getByText('Đặt hàng không cần tài khoản',{exact:true})).toBeVisible();
   const email=`srs-${info.project.name}-${Date.now()}@example.test`;
-  await page.getByLabel('Họ tên',{exact:true}).fill('Khách Kiểm Thử');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Số điện thoại').fill('0901234567');await page.getByLabel('Địa chỉ chi tiết').fill('123 Demo Street');await page.getByLabel('Tỉnh/thành').selectOption({index:1});await expect(page.getByLabel('Phường/xã').locator('option')).not.toHaveCount(1);await page.getByLabel('Phường/xã').selectOption({index:1});
+  await page.getByLabel('Họ tên',{exact:true}).fill('Khách Kiểm Thử');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Số điện thoại').fill('0901234567');await page.getByLabel('Địa chỉ chi tiết').fill('123 Demo Street');
+  await page.getByRole('button',{name:'Tỉnh/Thành phố, Phường/Xã *',exact:true}).click();
+  await page.getByRole('combobox',{name:'Tìm tỉnh/thành phố'}).fill('ha noi');
+  await page.getByRole('option',{name:'Thành phố Hà Nội',exact:true}).click();
+  await page.getByRole('combobox',{name:'Tìm phường/xã'}).fill('ba dinh');
+  await page.getByRole('option',{name:'Phường Ba Đình',exact:true}).click();
   await page.getByRole('button',{name:'Gửi mã xác minh email',exact:true}).click();await expect(page.getByText(/Vui lòng kiểm tra hộp thư/)).toBeVisible();
   await mongoose.connect(process.env.MONGO_URI);let code;try{const emailRecord=await mongoose.connection.db.collection('emails').findOne({to:email,template:'guestCheckout'});code=emailRecord.html.match(/>\s*(\d{6})\s*</)[1];}finally{await mongoose.disconnect();}
   await page.getByLabel('Mã OTP',{exact:true}).fill(code);await page.getByRole('button',{name:'Xác minh mã',exact:true}).click();await expect(page.getByText('Email đã xác minh cho lần đặt hàng này.')).toBeVisible();
   const created=page.waitForResponse(r=>r.url().endsWith('/api/orders')&&r.request().method()==='POST');await page.getByRole('button',{name:'Đặt hàng COD',exact:true}).click();const response=await created;expect(response.status(),await response.text()).toBe(201);const order=await response.json();
   expect(order.items[0].priceBreakdown.printFee).toBe(110000);
+  expect(order.shippingAddress).toMatchObject({provinceCode:'01',wardCode:'00004',province:'Thành phố Hà Nội',ward:'Phường Ba Đình',district:''});
   const confirmed=await page.request.put(`/api/admin/orders/${order.id}/status`,{headers,data:{status:'confirmed'}});expect(confirmed.ok()).toBeTruthy();
   const ctx=await browser.newContext({baseURL:process.env.TEST_BASE_URL,viewport:info.project.use.viewport});const staff=await ctx.newPage();await staff.goto('/login');await staff.getByLabel('Email',{exact:true}).fill('staff@velathier.vn');await staff.getByLabel('Mật khẩu',{exact:true}).fill('staff123');await staff.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(staff).not.toHaveURL(/\/login/);await staff.goto('/admin');await staff.getByRole('button',{name:'Xưởng in',exact:true}).click();const card=staff.locator('article').filter({hasText:order.id});
   await card.getByRole('button',{name:'Duyệt thiết kế',exact:true}).click();await expect(card.getByRole('button',{name:'Đang in',exact:true})).toBeVisible();await card.getByRole('button',{name:'Đang in',exact:true}).click();await card.getByRole('button',{name:'Kiểm tra chất lượng',exact:true}).click();await card.getByRole('button',{name:'Hoàn tất in',exact:true}).click();await expect(card.getByText('Hoàn tất in',{exact:true}).first()).toBeVisible();

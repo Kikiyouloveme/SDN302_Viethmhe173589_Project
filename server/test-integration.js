@@ -46,6 +46,7 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!ready) throw new Error('Server did not start: ' + serverOutput);
+    await run('test-locations.js', env);
     await run('test-api.js', env);
     await run('test-mongo.js', env);
     await run('test-reviews.js', env);

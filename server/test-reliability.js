@@ -9,7 +9,7 @@ async function main(){
   const call=async(base,url,body,user=buyer)=>{const r=await fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${sign(user)}`},body:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
   const base=process.env.TEST_BASE_URL;
   const created=await call(base,'/api/products',{title:'Replica race last stock',cat:'tops',price:100000,variants:[{color:'Trắng',size:'M',stock:1}]},admin);assert.equal(created.status,201,JSON.stringify(created.body));
-  const p=created.body,body={items:[{productId:p.id,variantId:p.variants[0].id,qty:1}],payMethod:'cod',address:{fullName:'Replica Test',phone:'0901234567',province:'HCM',district:'Q1',ward:'P1',line1:'1 Test'}};
+  const p=created.body,body={items:[{productId:p.id,variantId:p.variants[0].id,qty:1}],payMethod:'cod',address:{fullName:'Replica Test',phone:'0901234567',provinceCode: '01', wardCode: '00004',line1:'1 Test'}};
   const result=await Promise.all([base,process.env.TEST_SECOND_BASE_URL].map(b=>call(b,'/api/orders',{...body,requestKey:crypto.randomUUID()})));
   assert.equal(result.filter(r=>r.status===201).length,1,JSON.stringify(result));assert(result.some(r=>[400,409].includes(r.status)));
   assert.equal((await db.models.products.findOne({id:p.id}).lean()).variants[0].stock,0);

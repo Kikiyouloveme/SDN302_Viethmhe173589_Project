@@ -24,7 +24,7 @@ const user = schema({
   pass: { type: String, required: true },
   role: { type: String, enum: ['customer', 'staff', 'admin'], required: true },
   emailVerified: Boolean, tokensValidFrom: Number, phone: String,
-  addresses: [embedded({ id: String, fullName: String, phone: String, line1: String, isDefault: Boolean })],
+  addresses: [embedded({ id: String, fullName: String, phone: String, provinceCode: String, province: String, wardCode: String, ward: String, district: String, line1: String, note: String, isDefault: Boolean, createdAt: String, updatedAt: String })],
 });
 const product = schema({
   title: { type: String, required: true, maxlength: 200 },

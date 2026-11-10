@@ -107,7 +107,7 @@ async function main() {
     token: A.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   });
@@ -245,7 +245,7 @@ async function main() {
       token: A.token,
       body: {
         items: [{ productId: soldOut.p.id, variantId: soldOut.v.id, qty: 1 }],
-        address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+        address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
         payMethod: 'cod',
       },
     });
@@ -265,7 +265,7 @@ async function main() {
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1, price: 1000 }],
       subtotal: 1000, discount: 999999, shippingFee: 0, total: 1,
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   });
@@ -278,7 +278,7 @@ async function main() {
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
       voucherCode: 'KHONGCOTHAT',
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   });
@@ -306,7 +306,7 @@ async function main() {
   const guestOrder = await call('POST', '/api/orders', {
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   });
@@ -340,7 +340,7 @@ async function main() {
     token: A.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'vnpay',
     },
   })).data;
@@ -391,7 +391,7 @@ async function main() {
     token: A.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   })).data;
@@ -423,7 +423,7 @@ async function main() {
     token: A.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'cod',
     },
   })).data;
@@ -479,7 +479,7 @@ async function main() {
       token: user.token,
       body: {
         items,
-        address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+        address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
         payMethod: 'cod',
         ...extra,
       },
@@ -573,7 +573,7 @@ async function main() {
     token: smUser.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'vnpay',
     },
   })).data;
@@ -751,7 +751,7 @@ async function main() {
     token: payUser.token,
     body: {
       items: [{ productId: p1.id, variantId: v1.id, qty: 1 }],
-      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', province: 'HCM', district: 'Q1', ward: 'P1', line1: '1 Test' },
+      address: { fullName: 'Nguyễn Văn A', phone: '0901234567', provinceCode: '01', wardCode: '00004', line1: '1 Test' },
       payMethod: 'vnpay',
     },
   })).data;

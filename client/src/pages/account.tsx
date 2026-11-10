@@ -1,3 +1,4 @@
+import { AddressSelector } from '@/components/address-selector';
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -261,7 +262,7 @@ function AddressesTab({ user, setUser }: { user: User; setUser: (u: User) => voi
     const get = (k: string) => String(form.get(k) || "").trim();
     const body = {
       fullName: get("fullName"), phone: get("phone"),
-      province: get("province"), district: get("district"), ward: get("ward"),
+      provinceCode: get("provinceCode"), wardCode: get("wardCode"),
       line1: get("line1"), note: get("note"),
       isDefault: form.get("isDefault") === "on",
     };
@@ -364,18 +365,7 @@ function AddressesTab({ user, setUser }: { user: User; setUser: (u: User) => voi
             <Label htmlFor="a-phone">Số điện thoại *</Label>
             <Input id="a-phone" name="phone" type="tel" inputMode="tel" required defaultValue={editing?.phone ?? user.phone} className="mt-2" />
           </div>
-          <div>
-            <Label htmlFor="a-province">Tỉnh / Thành phố *</Label>
-            <Input id="a-province" name="province" required defaultValue={editing?.province} placeholder="TP. Hồ Chí Minh" className="mt-2" />
-          </div>
-          <div>
-            <Label htmlFor="a-district">Quận / Huyện *</Label>
-            <Input id="a-district" name="district" required defaultValue={editing?.district} placeholder="Quận 1" className="mt-2" />
-          </div>
-          <div>
-            <Label htmlFor="a-ward">Phường / Xã *</Label>
-            <Input id="a-ward" name="ward" required defaultValue={editing?.ward} placeholder="Phường Bến Nghé" className="mt-2" />
-          </div>
+          <AddressSelector defaultValue={editing || undefined} />
           <div>
             <Label htmlFor="a-line1">Địa chỉ chi tiết *</Label>
             <Input id="a-line1" name="line1" required defaultValue={editing?.line1} placeholder="Số nhà, tên đường" className="mt-2" />

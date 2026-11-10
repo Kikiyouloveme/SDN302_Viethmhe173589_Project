@@ -19,6 +19,8 @@ interface DialogProps {
  */
 export function Dialog({ open, onClose, title, description, children, footer, size = "md" }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -33,10 +35,13 @@ export function Dialog({ open, onClose, title, description, children, footer, si
     focusables?.[0]?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") { onClose(); return; }
-      if (e.key !== "Tab" || !focusables?.length) return;
+      if (e.key === "Escape") { closeRef.current(); return; }
+      if (e.key !== "Tab") return;
       // Vòng focus quanh nội dung hộp thoại
-      const list = Array.from(focusables).filter((el) => !el.hasAttribute("disabled"));
+      const list = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) || []).filter((el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.getClientRects().length > 0);
+      if (!list.length) return;
       const first = list[0];
       const last = list[list.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -49,7 +54,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
       document.body.style.overflow = "";
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

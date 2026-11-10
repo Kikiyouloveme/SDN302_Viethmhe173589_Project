@@ -6,6 +6,8 @@ export interface Address {
   id: string;
   fullName: string;
   phone: string;
+  provinceCode?: string;
+  wardCode?: string;
   province: string;
   district: string;
   ward: string;

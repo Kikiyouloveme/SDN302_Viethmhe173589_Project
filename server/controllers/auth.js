@@ -74,13 +74,7 @@ const postRegister = async (req, res) => {
   if (addr && typeof addr === 'object' && addr.line1) {
     user.addresses.push({
       id: db.uid('addr'),
-      fullName: name,
-      phone: phone || '',
-      province: String(addr.province || '').slice(0, 100),
-      district: String(addr.district || '').slice(0, 100),
-      ward: String(addr.ward || '').slice(0, 100),
-      line1: String(addr.line1).slice(0, 200),
-      note: '',
+      ...require('../checkout-validation').validateAddress({ ...addr, fullName: name, phone }),
       isDefault: true,
       createdAt: new Date().toISOString(),
     });
@@ -259,17 +253,7 @@ const putPassword = async (req, res) => {
 
 /* ==================== SỔ ĐỊA CHỈ ==================== */
 
-function readAddress(body) {
-  return {
-    fullName: v.str(body.fullName, 'họ tên người nhận', { min: 2, max: 80 }),
-    phone: v.phone(body.phone),
-    province: v.str(body.province, 'Tỉnh/Thành phố', { max: 100 }),
-    district: v.str(body.district, 'Quận/Huyện', { max: 100 }),
-    ward: v.str(body.ward, 'Phường/Xã', { max: 100 }),
-    line1: v.str(body.line1, 'địa chỉ chi tiết', { min: 3, max: 200 }),
-    note: v.str(body.note, 'ghi chú', { required: false, max: 200 }),
-  };
-}
+const readAddress = require('../checkout-validation').validateAddress;
 
 const getAddresses = async (req, res) => {
   res.json(req.user.addresses || []);

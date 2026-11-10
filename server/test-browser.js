@@ -12,7 +12,7 @@ async function main(){
     await run(['server/seed.js']);await run(['server/migrate-custom-print.js']);await run(['server/migrate-print-srs.js']);
     server=spawn(process.execPath,['server/server.js'],{env,windowsHide:true,stdio:'ignore'});
     let ready=false;for(let i=0;i<100;i++){try{if((await fetch(env.TEST_BASE_URL+'/api/health')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}if(!ready)throw Error('Browser test server did not start');
-    await run([require.resolve('@playwright/test/cli'),'test','--config=playwright.config.cjs']);
+    await run([require.resolve('@playwright/test/cli'),'test','--config=playwright.config.cjs',...process.argv.slice(2)]);
   }finally{
     if(server?.exitCode===null){const exited=new Promise(r=>server.once('exit',r));server.kill();await exited;}
     await mongoose.connect(env.MONGO_URI);if(mongoose.connection.name!==name)throw Error('Unsafe cleanup');await mongoose.connection.dropDatabase();await mongoose.disconnect();

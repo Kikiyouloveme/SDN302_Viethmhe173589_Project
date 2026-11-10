@@ -1,3 +1,4 @@
+import { AddressSelector } from '@/components/address-selector';
 import {PrivateImage} from '@/components/private-image';
 import {GuestCheckout} from '@/components/guest-checkout';
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -158,7 +159,7 @@ function AccountCheckout() {
     try {
       const created = await api.post<Address>("/api/auth/addresses", {
         fullName: get("fullName"), phone: get("phone"),
-        province: get("province"), district: get("district"), ward: get("ward"),
+        provinceCode: get("provinceCode"), wardCode: get("wardCode"),
         line1: get("line1"), note: get("note"),
         isDefault: addresses.length === 0,
       });
@@ -453,18 +454,7 @@ function AccountCheckout() {
             <Label htmlFor="phone">Số điện thoại *</Label>
             <Input id="phone" name="phone" type="tel" inputMode="tel" required defaultValue={user.phone} placeholder="0901234567" className="mt-2" />
           </div>
-          <div>
-            <Label htmlFor="province">Tỉnh / Thành phố *</Label>
-            <Input id="province" name="province" required placeholder="TP. Hồ Chí Minh" className="mt-2" />
-          </div>
-          <div>
-            <Label htmlFor="district">Quận / Huyện *</Label>
-            <Input id="district" name="district" required placeholder="Quận 1" className="mt-2" />
-          </div>
-          <div>
-            <Label htmlFor="ward">Phường / Xã *</Label>
-            <Input id="ward" name="ward" required placeholder="Phường Bến Nghé" className="mt-2" />
-          </div>
+          <AddressSelector />
           <div>
             <Label htmlFor="line1">Địa chỉ chi tiết *</Label>
             <Input id="line1" name="line1" required placeholder="Số nhà, tên đường" className="mt-2" />
