@@ -13,7 +13,7 @@ test('Customer studio → Staff SRS review → production → delivery → revie
   await page.screenshot({path:`server/private/browser-results/${testInfo.project.name}-studio.png`,fullPage:true});
   await page.getByRole('button',{name:'Thêm vào giỏ',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Đã thêm mẫu in vào giỏ'}).first()).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart')||'[]').length)).toBeGreaterThan(0);
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart:user:'+JSON.parse(localStorage.getItem('vela_user')).id)||'[]').length)).toBeGreaterThan(0);
   await page.goto('/checkout');
   const created=page.waitForResponse(r=>r.url().endsWith('/api/orders')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Đặt hàng',exact:true}).click();const response=await created;expect(response.status()).toBe(201);const order=await response.json();
@@ -47,7 +47,7 @@ await page.goto('/product/blank-regular');await page.getByLabel('Lần mua').sel
 test('VNPay link failure survives refresh without duplicate order or lost cart',async({page})=>{
   await login(page,'khach@velathier.vn','khach123');
   const products=await api(page,'GET','/api/products'),product=products.find(p=>p.variants.some(v=>v.stock>0)),variant=product.variants.find(v=>v.stock>0);
-  await page.evaluate(({p,v})=>localStorage.setItem('vela_cart',JSON.stringify([{key:v.id,productId:p.id,variantId:v.id,title:p.title,color:v.color,size:v.size,img:p.img,price:p.price,qty:1,maxStock:v.stock}])),{p:product,v:variant});
+  await page.evaluate(({p,v})=>localStorage.setItem('vela_cart:user:'+JSON.parse(localStorage.getItem('vela_user')).id,JSON.stringify([{key:v.id,productId:p.id,variantId:v.id,title:p.title,color:v.color,size:v.size,img:p.img,price:p.price,qty:1,maxStock:v.stock}])),{p:product,v:variant});
   await page.goto('/checkout');await page.getByRole('radio',{name:/VNPay/}).check();
   let creates=0;page.on('request',r=>{if(r.url().endsWith('/api/orders')&&r.method()==='POST')creates++;});
   await page.route('**/api/payment/vnpay/create',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Lỗi liên kết thanh toán kiểm thử'})}));
@@ -55,7 +55,7 @@ test('VNPay link failure survives refresh without duplicate order or lost cart',
   await expect(page.getByRole('link',{name:'Tiếp tục / thử lại thanh toán'})).toBeVisible();
   const href=await page.getByRole('link',{name:'Tiếp tục / thử lại thanh toán'}).getAttribute('href');
   await page.reload();await expect(page.getByRole('link',{name:'Tiếp tục / thử lại thanh toán'})).toHaveAttribute('href',href);
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart')).length)).toBe(1);expect(creates).toBe(1);
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart:user:'+JSON.parse(localStorage.getItem('vela_user')).id)).length)).toBe(1);expect(creates).toBe(1);
   await page.getByRole('link',{name:'Tiếp tục / thử lại thanh toán'}).click();
   await page.getByRole('button',{name:'Thanh toán qua VNPay',exact:true}).click();
   await expect(page.getByText('Lỗi liên kết thanh toán kiểm thử',{exact:true}).first()).toBeVisible();expect(creates).toBe(1);
@@ -64,7 +64,7 @@ test('VNPay link failure survives refresh without duplicate order or lost cart',
   await page.getByRole('button',{name:'Thử lại thanh toán trên đơn này'}).click();
   await page.getByRole('link',{name:'Thanh toán thành công',exact:true}).click();
   await expect(page.getByText('Thanh toán thành công qua VNPay',{exact:true})).toBeVisible();
-  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart')||'[]').length)).toBe(0);
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('vela_cart:user:'+JSON.parse(localStorage.getItem('vela_user')).id)||'[]').length)).toBe(0);
   expect(creates).toBe(1);
 });
 test('Studio upload to another position keeps pending text edit',async({page})=>{
@@ -85,4 +85,24 @@ test('Studio upload to another position keeps pending text edit',async({page})=>
   const front=final.revision.snapshot.layers.front;
   expect(front.find(l=>l.position==='FRONT').text).toBe('Giữ chữ mới');
   expect(front.find(l=>l.position==='LEFT_CHEST').type).toBe('image');
+});
+
+test('Cart isolation across accounts, logout and reload',async({page})=>{
+  await login(page,'khach@velathier.vn','khach123');
+  const products=await api(page,'GET','/api/products'),p=products.find(p=>p.variants.some(v=>v.stock>0)),v=p.variants.find(v=>v.stock>0);
+  await page.evaluate(({p,v})=>{
+    const key='vela_cart:user:'+JSON.parse(localStorage.getItem('vela_user')).id;
+    localStorage.setItem(key,JSON.stringify([{key:v.id,productId:p.id,variantId:v.id,title:'PRIVATE_CART_A',color:v.color,size:v.size,img:p.img,price:p.price,qty:1,maxStock:v.stock}]));
+  },{p,v});
+  await page.goto('/checkout');await expect(page.getByText('PRIVATE_CART_A',{exact:true}).first()).toBeVisible();
+  const loginB=await page.request.post('/api/auth/login',{data:{email:'staff@velathier.vn',password:'staff123'}});expect(loginB.ok()).toBeTruthy();
+  const b=await loginB.json();
+  await page.evaluate(b=>{localStorage.setItem('vela_token',b.token);localStorage.setItem('vela_user',JSON.stringify(b.user));window.dispatchEvent(new StorageEvent('storage',{key:'vela_token'}));},b);
+  await expect(page.getByText('PRIVATE_CART_A',{exact:true})).toHaveCount(0);
+  await expect(page.locator('h1')).toContainText('Giỏ hàng trống');
+  await page.evaluate(()=>{localStorage.removeItem('vela_token');localStorage.removeItem('vela_user');window.dispatchEvent(new StorageEvent('storage',{key:'vela_token'}));});
+  await expect(page.getByRole('heading',{name:'Đặt hàng không cần tài khoản'})).toBeVisible();
+  await expect(page.getByText('PRIVATE_CART_A',{exact:true})).toHaveCount(0);
+  await page.reload();await expect(page.getByText('PRIVATE_CART_A',{exact:true})).toHaveCount(0);
+  await login(page,'khach@velathier.vn','khach123');await page.goto('/checkout');await expect(page.getByText('PRIVATE_CART_A',{exact:true}).first()).toBeVisible();
 });

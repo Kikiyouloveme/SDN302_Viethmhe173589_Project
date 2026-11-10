@@ -83,6 +83,27 @@ function returnWindow(order) {
   return { deadline, expired: Date.now() > deadline, daysLeft: Math.max(0, Math.ceil((deadline - Date.now()) / 86400000)) };
 }
 
+/**
+ * Đơn đã trả hết hàng chưa?
+ *
+ * Dùng để quyết định đóng đơn (`refunded`) hay để mở (`returned`) cho lần trả tiếp
+ * theo. Hoàn tiền một phần mà đóng đơn ngay thì phần hàng còn lại sẽ không bao giờ
+ * trả được nữa, dù vẫn trong 7 ngày.
+ *
+ * @param {object} order
+ * @param {object|null} ret yêu cầu vừa hoàn tất — tính cả nó dù `db.returns` có thể chưa commit
+ */
+function allItemsReturned(order, ret) {
+  const returned = returnedQtyByVariant(order.id);
+  if (ret) {
+    for (const item of ret.items) {
+      const key = item.lineId || item.variantId;
+      returned[key] = (returned[key] || 0) + item.qty;
+    }
+  }
+  return order.items.every((line) => (returned[line.lineId || line.variantId] || 0) >= line.qty);
+}
+
 /** Khách không được xem thông tin ngân hàng của người khác, cũng không thấy ghi chú nội bộ */
 function viewFor(ret, user) {
   const isStaff = user && ['admin', 'staff'].includes(user.role);
@@ -127,9 +148,9 @@ const getEligibilityOrderId = async (req, res) => {
     .filter((x) => x.remaining > 0);
 
   // Đơn đã giao nhưng đang có yêu cầu xử lý dở thì trạng thái đơn không còn là DELIVERED,
-  // nên phải xét cả các trạng thái thuộc quy trình đổi/trả.
-  const delivered = order.status === STATUS.DELIVERED
-    || [STATUS.RETURN_REJECTED].includes(order.status);
+  // nên phải xét cả các trạng thái thuộc quy trình đổi/trả. `returned` = đã trả một lần
+  // nhưng còn hàng chưa trả, vẫn được gửi yêu cầu tiếp trong hạn.
+  const delivered = [STATUS.DELIVERED, STATUS.RETURN_REJECTED, STATUS.RETURNED].includes(order.status);
 
   res.json({
     eligible: delivered && !!window && !window.expired && !inProgress.length && remainingItems.length > 0,
@@ -153,7 +174,7 @@ const post = async (req, res) => {
   if (!order || order.userId !== req.user.id) throw notFound('Không tìm thấy đơn hàng');
 
   // Điều kiện thời gian — kiểm tra ở server, không chỉ ở giao diện
-  if (![STATUS.DELIVERED, STATUS.RETURN_REJECTED].includes(order.status)) {
+  if (![STATUS.DELIVERED, STATUS.RETURN_REJECTED, STATUS.RETURNED].includes(order.status)) {
     throw badRequest('Chỉ có thể yêu cầu đổi/trả sau khi đơn hàng đã giao thành công');
   }
   const window = returnWindow(order);
@@ -314,6 +335,11 @@ const putIdReview = async (req, res) => {
   const decision = v.oneOf(req.body.decision, ['approved', 'rejected'], 'quyết định');
   const adminNote = v.str(req.body.adminNote, 'ghi chú', { required: false, max: 500 });
   const order = db.orders.byId(ret.orderId);
+  // Đơn phải đang chờ duyệt đúng như khi khách gửi yêu cầu. Không kiểm tra thì đơn đã
+  // bị huỷ/đã hoàn tiền vẫn bị kéo ngược về "return_approved", thoát khỏi trạng thái kết thúc.
+  if (order && order.status !== STATUS.RETURN_REQUESTED) {
+    throw badRequest(`Đơn hàng không còn ở trạng thái chờ duyệt đổi/trả (hiện tại: ${order.status}).`);
+  }
 
   // Admin quyết định cuối cùng ai chịu phí vận chuyển
   const responsibility = req.body.shippingResponsibility
@@ -467,6 +493,10 @@ const putIdExchange = async (req, res) => {
       fulfilledBy: req.user.id,
     };
     ret.status = 'completed';
+    // Đổi hàng xong thì không còn gì để hoàn tiền cho phần hàng này — nếu giữ
+    // refundAmount, API hoàn tiền vẫn tính được trần hoàn cho món đã đổi.
+    ret.refundAmount = 0;
+    ret.refundStatus = 'not_applicable';
     ret.history.push({
       at: new Date().toISOString(),
       status: 'completed',
@@ -607,6 +637,12 @@ async function processRefund({ order, ret, amount, method, reference, note, acto
     if (!gatewayRef) {
       refundStatus = 'pending_manual';
       statusNote = 'Chưa có mã giao dịch chuyển khoản. Hãy chuyển khoản rồi nhập mã để xác nhận.';
+    } else {
+      // Xác nhận "đã hoàn tiền" là giảm doanh thu thật, phải cùng chuẩn với nhánh VNPay:
+      // chỉ Admin và phải có mã đối soát đủ dài, nếu không nhân viên gõ "1" là trừ tiền sổ sách.
+      if (actor.role !== 'admin') throw forbidden('Chỉ Admin được xác nhận đã chuyển khoản hoàn tiền');
+      if (gatewayRef.length < 5) throw badRequest('Cần mã giao dịch đối soát tối thiểu 5 ký tự');
+      statusNote = 'Admin đã xác nhận hoàn tiền bằng chuyển khoản, đối soát theo mã giao dịch.';
     }
   }
 
@@ -633,7 +669,10 @@ async function processRefund({ order, ret, amount, method, reference, note, acto
       order.refundTransactions.push({key:refundKey,amount,method,result:structuredClone(order.refund)});
       // Cộng dồn để hỗ trợ hoàn nhiều lần (hoàn từng phần)
       order.refundedTotal = (Number(order.refundedTotal) || 0) + amount;
-      order.status = STATUS.REFUNDED;
+      // Chỉ đóng đơn khi TOÀN BỘ hàng đã được trả. Khách còn hàng trong hạn 7 ngày
+      // thì đơn phải tiếp tục cho gửi yêu cầu trả nốt — trước đây đặt REFUNDED ngay
+      // nên lần trả sau bị chặn vĩnh viễn.
+      order.status = allItemsReturned(order, ret) ? STATUS.REFUNDED : STATUS.RETURNED;
     } else {
       order.status = STATUS.REFUND_PENDING;
     }

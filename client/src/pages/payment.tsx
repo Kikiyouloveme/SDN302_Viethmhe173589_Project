@@ -24,7 +24,6 @@ export default function Payment() {
   const toast = useToast();
   const { orderId } = useParams();
   const [params] = useSearchParams();
-  const cod = params.get("cod") === "1";
   const vietqrRequested = params.get("vietqr") === "1";
   const vnp = params.get("vnp"); // paid | failed | invalid | notfound
 
@@ -154,7 +153,22 @@ export default function Payment() {
   );
 
   /* --- COD --- */
-  if (cod || (order.payMethod === "cod" && order.payStatus !== "paid")) {
+  // Chỉ đơn COD thật sự mới hiện "Đặt hàng thành công". Trước đây `cod ||` cho phép
+  // query `?cod=1` đẩy một đơn VNPay/VietQR đang treo hoặc đơn đã huỷ vào nhánh này.
+  const isCancelled = order.status === "cancelled" || order.status === "refund_pending" || order.status === "refunded";
+  if (isCancelled) {
+    return (
+      <Shell>
+        <Badge variant="warning" className="mb-4">Đơn đã đóng</Badge>
+        {info}
+        <p className="mt-4 text-sm text-muted-foreground">
+          Đơn hàng này đã được huỷ hoặc đã xử lý hoàn tiền. Nếu bạn đã chuyển khoản, cửa hàng sẽ liên hệ để hoàn lại.
+        </p>
+        {actions}
+      </Shell>
+    );
+  }
+  if (order.payMethod === "cod" && order.payStatus !== "paid") {
     return (
       <Shell>
         {info}

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { CART_KEY, type Product, type Variant } from "@/lib/api";
+import { useAuth } from "./auth";
 import { cartLineKey } from '@/lib/cart-identity';
 
 /**
@@ -44,9 +45,18 @@ const Ctx = createContext<CartCtx>(null!);
 export const useCart = () => useContext(Ctx);
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, ready } = useAuth();
+  if (!ready) return null;
+  const owner = user ? `user:${user.id}` : 'guest';
+  return <OwnedCartProvider key={owner} owner={owner}>{children}</OwnedCartProvider>;
+}
+
+function OwnedCartProvider({ children, owner }: { children: ReactNode; owner: string }) {
+  const storage = owner === 'guest' ? sessionStorage : localStorage;
+  const storageKey = `${CART_KEY}:${owner}`;
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+      const parsed = JSON.parse(storage.getItem(storageKey) || "[]");
       // Bỏ qua dữ liệu giỏ hàng theo định dạng cũ (trước khi có biến thể)
       return Array.isArray(parsed) ? parsed.filter((i) => i && i.variantId && i.productId).map(i=>({...i,key:cartLineKey(i.variantId,i.designRevisionId)})) : [];
     } catch {
@@ -56,8 +66,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-  }, [items]);
+    // Old shared carts have no trustworthy owner and must not be migrated.
+    localStorage.removeItem(CART_KEY);
+    storage.setItem(storageKey, JSON.stringify(items));
+  }, [items, storage, storageKey]);
 
   const add = (product: Product, variant: Variant, qty = 1) => {
     const key=cartLineKey(variant.id);
@@ -87,7 +99,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) =>
       qty <= 0
         ? prev.filter((i) => i.key !== key)
-        : prev.map((i) => (i.key === key ? { ...i, qty: Math.min(qty, i.maxStock || 20, 20) } : i))
+        // `i.maxStock || 20` biến tồn kho 0 thành 20 — dòng đã hết hàng vẫn tăng được
+        // tới 20 trên giao diện rồi mới bị server từ chối ở bước báo giá.
+        : prev.map((i) => (i.key === key ? { ...i, qty: Math.min(qty, Math.max(1, i.maxStock ?? 20), 20) } : i))
     );
 
   const remove = (key: string) => setItems((prev) => prev.filter((i) => i.key !== key));

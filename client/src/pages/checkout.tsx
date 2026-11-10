@@ -86,7 +86,7 @@ function AccountCheckout() {
 
   /* ---------- lấy báo giá từ server (nguồn số tiền duy nhất) ---------- */
   const fetchQuote = useCallback(async (voucherCode?: string) => {
-    if (!items.length) return;
+    if (!items.length) return null as Quote | null;
     setQuoteError("");
     try {
       const result = await api.post<Quote>("/api/orders/quote", {
@@ -98,29 +98,44 @@ function AccountCheckout() {
         setVoucherError(result.voucherError);
         setAppliedVoucher("");
       }
+      return result;
     } catch (err) {
       setQuoteError(err instanceof ApiError ? err.message : "Không tính được đơn hàng");
+      return null as Quote | null;
     }
   }, [items, payload, appliedVoucher]);
 
   useEffect(() => {
     if (user?.emailVerified) fetchQuote();
+    // Phụ thuộc vào chính giỏ hàng chứ không chỉ số dòng: khách tăng/giảm số lượng
+    // của một dòng đã có thì `items.length` không đổi, quote cũ vẫn hiển thị và nút
+    // đặt hàng gửi `acceptedTotal` cũ — khách thấy một giá, bị tính giá khác.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, user?.emailVerified]);
+  }, [JSON.stringify(payload()), user?.emailVerified]);
 
   /* ---------- voucher ---------- */
   async function applyVoucher(e: React.FormEvent) {
     e.preventDefault();
     const code = voucherInput.trim().toUpperCase();
     if (!code) return;
+    // Chưa có báo giá thì chưa biết giá trị đơn — gửi subtotal 0 sẽ bị từ chối oan
+    // ("chưa đạt giá trị tối thiểu") dù giỏ đã đủ điều kiện.
+    if (!quote) return toast.error("Đang tính tổng tiền, vui lòng thử lại sau giây lát");
     setCheckingVoucher(true);
     setVoucherError("");
     try {
-      await api.post("/api/vouchers/validate", { code, subtotal: quote?.subtotal ?? 0 });
+      const result = await api.post<{ ok: boolean; voucher: { code: string } }>("/api/vouchers/validate", { code, subtotal: quote.subtotal });
       setAppliedVoucher(code);
-      await fetchQuote(code);
-      toast.success(`Đã áp dụng mã ${code}`);
-      setVoucherInput("");
+      const fresh = await fetchQuote(code);
+      // Chỉ báo thành công khi báo giá mới thật sự giữ được mã — trước đây vừa toast
+      // "Đã áp dụng" vừa hiện lỗi khi mã không còn dùng được cho giỏ này.
+      if (fresh?.voucherError) {
+        setVoucherError(fresh.voucherError);
+        setAppliedVoucher("");
+      } else {
+        toast.success(`Đã áp dụng mã ${result?.voucher?.code || code}`);
+        setVoucherInput("");
+      }
     } catch (err) {
       setVoucherError(err instanceof ApiError ? err.message : "Mã giảm giá không hợp lệ");
     } finally {
@@ -182,7 +197,11 @@ function AccountCheckout() {
         window.location.href = url; // rời SPA sang cổng thanh toán
         return;
       }
-      clear();sessionStorage.removeItem(recoveryKey);
+      sessionStorage.removeItem(recoveryKey);
+      // COD: giỏ đã hoàn tất vai trò → dọn ngay. VietQR thì khách CHƯA trả tiền:
+      // giữ giỏ cho tới khi cửa hàng xác nhận, nếu không khách đổi ý/bỏ ngang là
+      // mất toàn bộ giỏ và phải chọn lại từ đầu.
+      if (pay === "cod") clear();
       // VietQR: sang trang thanh toán để hiện mã QR và chờ cửa hàng xác nhận
       navigate(`/payment/${order.id}${pay === "vietqr" ? "?vietqr=1" : "?cod=1"}`, { replace: true });
     } catch (err) {
@@ -345,7 +364,7 @@ function AccountCheckout() {
                     aria-invalid={!!voucherError}
                     className="h-11 uppercase"
                   />
-                  <Button type="submit" variant="outline" disabled={checkingVoucher || !voucherInput.trim()} className="shrink-0">
+                  <Button type="submit" variant="outline" disabled={checkingVoucher || !voucherInput.trim() || !quote} className="shrink-0">
                     {checkingVoucher ? <Loader2 className="animate-spin" /> : "Áp dụng"}
                   </Button>
                 </form>
@@ -404,8 +423,9 @@ function AccountCheckout() {
             >
               {placing
                 ? <><Loader2 className="animate-spin" /> Đang xử lý…</>
-                : pay === "vnpay" ? `Thanh toán VNPay · ${money(quote?.total ?? 0)}`
-                : pay === "vietqr" ? `Đặt hàng & nhận mã QR · ${money(quote?.total ?? 0)}` : "Đặt hàng"}
+                : !quote ? "Đang tính tổng tiền…"
+                : pay === "vnpay" ? `Thanh toán VNPay · ${money(quote.total)}`
+                : pay === "vietqr" ? `Đặt hàng & nhận mã QR · ${money(quote.total)}` : "Đặt hàng"}
             </Button>
 
             {!addressId && addresses.length > 0 && (

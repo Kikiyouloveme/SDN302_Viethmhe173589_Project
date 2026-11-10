@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, TOKEN_KEY, USER_KEY, type User } from "@/lib/api";
+import { api, CART_KEY, TOKEN_KEY, USER_KEY, type User } from "@/lib/api";
 
 interface AuthCtx {
   user: User | null;
@@ -36,11 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    // Giỏ hàng thuộc về người đang đăng nhập. Nếu không dọn, người tiếp theo dùng
+    // máy này (thư viện, máy gia đình) sẽ thấy hàng người trước đã chọn.
+    localStorage.removeItem(CART_KEY);
+    sessionStorage.removeItem(`${CART_KEY}:guest`);
+    sessionStorage.removeItem('vela-guest-order');
+    sessionStorage.removeItem('vela-guest-order-email');
     setUserState(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!localStorage.getItem(TOKEN_KEY)) return null;
+    if (!localStorage.getItem(TOKEN_KEY)) { setUserState(null); return null; }
     try {
       const fresh = await api.get<User>("/api/auth/me");
       setUser(fresh);
@@ -56,7 +62,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setReady(true));
   }, [refresh]);
 
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === TOKEN_KEY || event.key === null) void refresh();
+    };
+    window.addEventListener('storage', sync);
+    window.addEventListener('vela-session-expired', clearSession);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('vela-session-expired', clearSession);
+    };
+  }, [refresh, clearSession]);
+
   const store = (token: string, u: User) => {
+    sessionStorage.removeItem(`${CART_KEY}:guest`);
+    sessionStorage.removeItem('vela-guest-order');
+    sessionStorage.removeItem('vela-guest-order-email');
     setToken(token);
     setUser(u);
   };

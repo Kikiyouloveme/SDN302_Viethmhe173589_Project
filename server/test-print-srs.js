@@ -38,6 +38,11 @@ async function main(){
   const orderBody={items:[item()],email:contact.email,guestTicket:ticket,address:{...contact,provinceCode:province.code,wardCode:province.wards[0].code,line1:'123 Demo Street'},payMethod:'cod',acceptedTotal:q.total,requestKey:crypto.randomUUID()};
   const order=await call('TC21 guest custom COD','POST','/api/orders',orderBody,201);assert.equal((await call('checkout idempotent','POST','/api/orders',orderBody)).id,order.id);
   await call('guest order isolation','GET',`/api/orders/guest/${order.id}`,null,404,b);
+  await call('guest owner can read order','GET',`/api/orders/guest/${order.id}`);
+  await call('guest order needs session','GET',`/api/orders/guest/${order.id}`,null,403,{});
+  await call('account cannot read guest order','GET',`/api/orders/${order.id}`,null,404,buyer);
+  await call('public contact lookup cannot expose order','GET',`/api/orders/lookup?code=${order.id}&contact=${contact.email}`,null,401,{});
+  await call('other guest cannot cancel','POST',`/api/orders/guest/${order.id}/cancel`,{reason:'Unauthorized cancellation'},404,b);
   let job=(await call('guest proof access','GET',`/api/orders/${order.id}/print-proofs`))[0];
   const review=(decision,reason,status=200)=>call('TC26 review '+decision,'POST',`/api/admin/print-jobs/${job.id}/review`,{decision,reason,designRevisionId:job.designRevisionId},status,staff);
   await review('approve','',409);await call('COD confirm','PUT',`/api/admin/orders/${order.id}/status`,{status:'confirmed'},200,staff);

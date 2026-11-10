@@ -85,6 +85,36 @@ const isExpired = (attempt) =>
   !!attempt && attempt.status === ATTEMPT.PENDING && Date.now() > new Date(attempt.expiresAt).getTime();
 
 /**
+ * Hạn thanh toán của một đơn, tính cả khi khách chưa từng mở cổng thanh toán.
+ *
+ * Trước đây chỉ dựa vào `attempt`, mà attempt chỉ được tạo khi khách bấm "Thanh toán".
+ * Đơn được tạo rồi bị bỏ dở (đóng tab) không có attempt nào → không bao giờ hết hạn,
+ * hàng bị giữ trong kho và lượt voucher bị khoá vĩnh viễn.
+ *
+ * @returns {number|null} mốc thời gian hết hạn (ms) hoặc null nếu đơn không có hạn
+ */
+function paymentDeadline(order) {
+  // VietQR: hạn gắn với mã QR đã phát cho khách
+  if (order.payMethod === 'vietqr') {
+    const issued = order.payment?.expiresAt ? Date.parse(order.payment.expiresAt) : NaN;
+    if (Number.isFinite(issued)) return issued;
+    const created = Date.parse(order.createdAt);
+    return Number.isFinite(created) ? created + config.payment.vietqrTtlMinutes * 60000 : null;
+  }
+  // VNPay: hạn của lần thử đang hoạt động, hoặc tính từ lúc tạo đơn
+  const attempt = activeAttempt(order);
+  if (attempt) return new Date(attempt.expiresAt).getTime();
+  const created = Date.parse(order.createdAt);
+  return Number.isFinite(created) ? created + config.payment.attemptTtlMinutes * 60000 : null;
+}
+
+/** Đơn chưa thanh toán và đã quá hạn giữ hàng thì phải hủy */
+function isPaymentExpired(order) {
+  const deadline = paymentDeadline(order);
+  return deadline !== null && Date.now() > deadline;
+}
+
+/**
  * Hoàn lại lượt dùng voucher của đơn — gọi khi đơn bị hủy/hết hạn.
  * Idempotent nhờ cờ `voucherReleased`.
  */
@@ -107,14 +137,17 @@ function releaseVoucher(order) {
  * @returns {boolean} có thay đổi gì không
  */
 function expireOrder(order, addHistory, STATUS) {
-  const attempt = activeAttempt(order);
-  if (!isExpired(attempt)) return false;
   if (order.payStatus === 'paid') return false;
+  if (!isPaymentExpired(order)) return false;
+  const attempt = activeAttempt(order);
 
   db.transaction(() => {
-    attempt.status = ATTEMPT.EXPIRED;
-    attempt.closedAt = new Date().toISOString();
+    if (attempt) {
+      attempt.status = ATTEMPT.EXPIRED;
+      attempt.closedAt = new Date().toISOString();
+    }
     order.payStatus = 'failed';
+    order.payment = order.payment && typeof order.payment === 'object' ? order.payment : {};
     order.payment.message = 'Hết hạn thanh toán';
     order.status = STATUS.CANCELLED;
     order.cancel = {
@@ -144,7 +177,8 @@ function expireOrder(order, addHistory, STATUS) {
 function sweepExpired(addHistory, STATUS) {
   let count = 0;
   for (const order of db.orders.all()) {
-    if (order.payMethod !== 'vnpay') continue;
+    // Chỉ đơn trả tiền trước mới có "hạn thanh toán"; COD thu tiền khi giao hàng.
+    if (order.payMethod !== 'vnpay' && order.payMethod !== 'vietqr') continue;
     if (order.payStatus === 'paid') continue;
     if (order.status === STATUS.CANCELLED) continue;
     if (expireOrder(order, addHistory, STATUS)) count++;
@@ -155,5 +189,5 @@ function sweepExpired(addHistory, STATUS) {
 module.exports = {
   ATTEMPT,
   ensurePayment, registerAttempt, findAttempt, activeAttempt,
-  isExpired, expireOrder, sweepExpired, releaseVoucher,
+  isExpired, paymentDeadline, isPaymentExpired, expireOrder, sweepExpired, releaseVoucher,
 };

@@ -326,6 +326,7 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
     if (res.status === 401 && token) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      window.dispatchEvent(new Event("vela-session-expired"));
     }
     throw new ApiError(payload.error || `Lỗi ${res.status}`, res.status, payload.code);
   }

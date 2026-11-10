@@ -41,6 +41,12 @@ const CUSTOMER_CANCELLABLE = [STATUS.PENDING, STATUS.CONFIRMED, STATUS.PROCESSIN
 /** Trạng thái mà việc trừ kho cần được hoàn lại */
 const RELEASES_STOCK = [STATUS.CANCELLED];
 
+/** Đang trong quy trình đổi/trả — không được huỷ đơn để tránh cộng kho hai lần */
+const RETURN_PIPELINE = [
+  STATUS.RETURN_REQUESTED, STATUS.RETURN_APPROVED, STATUS.RETURNING,
+  STATUS.RETURNED, STATUS.REFUND_PENDING, STATUS.REFUNDED,
+];
+
 const ALL_STATUSES = Object.values(STATUS);
 
 /**
@@ -255,7 +261,12 @@ const post = async (req, res) => {
   const { lines, subtotal } = pricing.buildLines(req.body.items, req.user||req.printActor);
   const totals = pricing.computeTotals(subtotal, req.body.voucherCode, req.user?.id);
 
-  if (lines.some(i => i.itemType === 'custom') && req.body.acceptedTotal !== totals.total) throw new HttpError(409, 'Giá đã thay đổi hoặc chưa được xác nhận. Xem báo giá mới rồi đặt lại.', 'QUOTE_CHANGED');
+  // Chặn mọi trường hợp tổng tiền khách nhìn thấy khác tổng server tính — kể cả
+  // giỏ thường. Trước đây chỉ so với dòng hàng in tùy chỉnh, nên khi giá/tồn thay đổi
+  // giữa lúc xem và lúc bấm đặt, đơn được tạo ở mức tiền khác con số trên màn hình.
+  if (req.body.acceptedTotal !== undefined && Number(req.body.acceptedTotal) !== totals.total) {
+    throw new HttpError(409, 'Giá đã thay đổi trong lúc bạn đặt hàng. Vui lòng xem lại tổng tiền rồi đặt lại.', 'QUOTE_CHANGED');
+  }
 
   // Client gửi voucher không dùng được thì báo lỗi rõ ràng thay vì âm thầm bỏ qua
   if (req.body.voucherCode && totals.voucherError) throw badRequest(totals.voucherError.message);
@@ -347,6 +358,16 @@ const postIdCancel = async (req, res) => {
   if (isStaff && [STATUS.DELIVERED, STATUS.RETURNED, STATUS.REFUNDED].includes(order.status)) {
     throw badRequest('Không thể hủy đơn đã giao thành công. Hãy dùng quy trình đổi/trả hàng.');
   }
+  // Hàng đã rời kho (đang giao) hoặc đang trong quy trình đổi/trả: huỷ ở đây sẽ cộng
+  // lại tồn kho trong khi hàng vẫn nằm ngoài cửa hàng — và nếu hàng về sau đó thì
+  // nhập kho lần nữa thành cộng đôi. Phải xử lý qua quy trình hoàn về người gửi.
+  if (isStaff && (order.status === STATUS.SHIPPED || RETURN_PIPELINE.includes(order.status))) {
+    throw badRequest(
+      order.status === STATUS.SHIPPED
+        ? 'Đơn đang giao cho khách. Hãy cập nhật hành trình hoàn về người gửi thay vì hủy đơn.'
+        : 'Đơn đang trong quy trình đổi/trả. Hãy hoàn tất quy trình đó thay vì hủy đơn.'
+    );
+  }
 
   db.transaction(() => {
     order.status = STATUS.CANCELLED;
@@ -402,7 +423,7 @@ const postIdCancel = async (req, res) => {
   res.json(viewFor(order, req.user));
 };
 
-module.exports = { getLocations, getLocationsCodeWards, postGuestSendCode, postGuestVerifyCode, postQuote, post, getMine, getId, postIdCancel, STATUS, ALL_STATUSES, CUSTOMER_CANCELLABLE, RELEASES_STOCK,
+module.exports = { getLocations, getLocationsCodeWards, postGuestSendCode, postGuestVerifyCode, postQuote, post, getMine, getId, postIdCancel, STATUS, ALL_STATUSES, CUSTOMER_CANCELLABLE, RELEASES_STOCK, RETURN_PIPELINE,
   TRANSITIONS, TERMINAL_STATUSES, canTransition, nextStatuses, applyTransition,
   addHistory, viewFor, getAuthorizedOrder,
 };

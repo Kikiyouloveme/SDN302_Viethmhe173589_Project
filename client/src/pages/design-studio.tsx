@@ -4,6 +4,7 @@ import { api, type Product, type Quote } from '@/lib/api';
 import type { Design, DesignLayer, DesignSnapshot, PrintSettings, Side } from '@/lib/custom-print';
 import { DesignCanvas } from '@/components/design-canvas';
 import { Button } from '@/components/ui/button';
+import { FileUpload } from '@/components/ui/file-upload';
 import { useCart } from '@/context/cart';
 import { money } from '@/lib/utils';
 import { useAuth } from '@/context/auth';
@@ -51,13 +52,14 @@ export default function DesignStudio() {
   function replaceAt(layers:DesignLayer[],layer:DesignLayer){return snapshot?.settings.workflowMode==='srs'?[...layers.filter(l=>(l.position||side.toUpperCase())!==layer.position),layer]:[...layers,layer];}
   function addText(){if(!snapshot)return;const layer:DesignLayer={id:crypto.randomUUID(),position,type:'text',text:'VELATHIER',font:snapshot.settings.supportedFonts?.[0]||'Arial',color:snapshot.settings.supportedColors?.[0]||'#111111',x:.5,y:.5,width:.8,height:.2,rotation:0};change({...snapshot,layers:{...snapshot.layers,[side]:replaceAt(snapshot.layers[side],layer)}});setSelected(layer.id);}
   async function upload(file:File){
-    if(!snapshot)return;if(!rights){const message='Vui lòng xác nhận quyền sử dụng ảnh';setError(message);toast.error(message);return;}
-    if(file.size>snapshot.settings.maxBytes||!(snapshot.settings.workflowMode==='srs'?['image/png','image/jpeg']:['image/png','image/jpeg','image/webp']).includes(file.type)){const message='Ảnh sai định dạng hoặc vượt dung lượng (SRS: PNG/JPG tối đa 5 MB)';setError(message);toast.error(message);return;}
+    if(!snapshot)return false;if(!rights){const message='Vui lòng xác nhận quyền sử dụng ảnh';setError(message);toast.error(message);return false;}
+    if(file.size>snapshot.settings.maxBytes||!(snapshot.settings.workflowMode==='srs'?['image/png','image/jpeg']:['image/png','image/jpeg','image/webp']).includes(file.type)){const message='Ảnh sai định dạng hoặc vượt dung lượng cho phép';setError(message);toast.error(message);return false;}
     const uploadSide=side,uploadPosition=position;setUploading(true);
-    try{const d=await save();if(!d)return;const body=new FormData();body.append('image',file);body.append('rightsConfirmed','true');const a=await api.post<{id:string;width:number;height:number;warning?:string}>(`${designApi}/${d.id}/assets`,body);
+    try{const d=await save();if(!d)return false;const body=new FormData();body.append('image',file);body.append('rightsConfirmed','true');const a=await api.post<{id:string;width:number;height:number;warning?:string}>(`${designApi}/${d.id}/assets`,body);
       const area=snapshot.settings.positions?.[uploadPosition]||snapshot.settings.areas[uploadSide];const ratio=a.height/a.width*area.widthMM/area.heightMM;
       const layer:DesignLayer={id:crypto.randomUUID(),position:uploadPosition,type:'image',assetId:a.id,x:.5,y:.5,width:Math.min(.8,.8/ratio),height:Math.min(.8,.8*ratio),rotation:0};const current=latest.current.snapshot;if(current)change({...current,layers:{...current.layers,[uploadSide]:replaceAt(current.layers[uploadSide],layer)}});setSelected(layer.id);if(a.warning){setMessage(a.warning);toast.info(a.warning);}else toast.success('Đã tải ảnh lên');
-    }catch(e){const message=(e as Error).message;setError(message);toast.error(message);}finally{setUploading(false);}
+      return true;
+    }catch(e){const message=(e as Error).message;setError(message);toast.error(message);return false;}finally{setUploading(false);}
   }
   async function toCart(){if(!product||!snapshot)return;const d=dirty||!design?await save():design;if(!d)return;setBusy(true);
     try{const q=await api.post<Quote>('/api/orders/quote',{items:[{productId:product.id,variantId:snapshot.variantId,itemType:'custom',designRevisionId:d.revisionId,qualityAcknowledged:quality,qty:1}]});
@@ -83,8 +85,11 @@ export default function DesignStudio() {
         {snapshot.settings.workflowMode==='srs'&&<p className="text-sm">Mỗi vị trí một nội dung. {POSITION_LABEL[position]}: tối đa {snapshot.settings.positions?.[position].maxChars} ký tự. Chọn ảnh để thay nội dung hiện tại.</p>}
         {textError&&<p role="alert" className="text-red-700">{textError}</p>}
         {item?.type==='text'&&snapshot.settings.workflowMode==='srs'&&<label className="block">Cỡ chữ (8–72)<input aria-label="Cỡ chữ" className="ml-2 w-20 border p-2" type="number" min={8} max={72} value={item.fontSize||32} onChange={e=>update({...item,fontSize:Number(e.target.value)})}/></label>}
-        <label className="flex gap-2 text-sm"><input type="checkbox" checked={rights} onChange={e=>setRights(e.target.checked)}/>Tôi có quyền hoặc được cho phép sử dụng ảnh tải lên.</label>
-        <label className="block text-sm">{snapshot.settings.workflowMode==='srs'?'Tải ảnh PNG/JPG, tối đa 5 MB, cạnh ngắn từ 500 px':'Tải ảnh PNG/JPEG/WebP'}<input type="file" accept={snapshot.settings.workflowMode==='srs'?'image/png,image/jpeg':'image/png,image/jpeg,image/webp'} disabled={uploading||!rights} onChange={e=>{if(e.target.files?.[0])void upload(e.target.files[0]);e.target.value='';}} className="mt-2 w-full"/></label>
+        <div className="space-y-3 border-t border-border/70 pt-4">
+          <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Ảnh thiết kế</h2><span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{POSITION_LABEL[position]}</span></div>
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-secondary/60 p-3 text-xs leading-relaxed"><input className="mt-0.5 size-4 shrink-0 accent-foreground" type="checkbox" checked={rights} onChange={e=>setRights(e.target.checked)}/>Tôi có quyền hoặc được cho phép sử dụng ảnh tải lên.</label>
+          <FileUpload key={position} accept={snapshot.settings.workflowMode==='srs'?'image/png,image/jpeg':'image/png,image/jpeg,image/webp'} maxBytes={snapshot.settings.maxBytes} disabled={!rights} uploading={uploading} hint={snapshot.settings.workflowMode==='srs'?'Cạnh ngắn từ 500 px · Nên dùng ảnh từ 1000 px':undefined} onChange={upload}/>
+        </div>
         {item&&<div className="space-y-2 border-t pt-3"><b>Lớp đang chọn</b>{item.type==='text'&&<><input aria-label="Nội dung chữ" className="w-full border p-2" value={item.text} onChange={e=>update({...item,text:e.target.value})}/><select aria-label="Font" value={item.font} onChange={e=>update({...item,font:e.target.value})}>{(snapshot.settings.supportedFonts||['Arial','Georgia','Courier New']).map(f=><option key={f}>{f}</option>)}</select><select aria-label="Màu chữ" value={item.color} onChange={e=>update({...item,color:e.target.value})}>{['#111111','#ffffff','#b91c1c','#1d4ed8','#15803d','#eab308'].map((c,i)=><option key={c} value={c}>{['Đen','Trắng','Đỏ','Xanh dương','Xanh lá','Vàng'][i]}</option>)}</select></>}
           {(['x','y','width','height','rotation'] as const).map(key=><label key={key} className="flex items-center justify-between text-sm">{{x:'Vị trí ngang',y:'Vị trí dọc',width:'Rộng',height:'Cao',rotation:'Góc xoay'}[key]}<input className="w-24 border p-1" type="number" step={key==='rotation'?1:.01} value={Math.round(item[key]*100)/100} onChange={e=>update({...item,[key]:Number(e.target.value)})}/></label>)}
           <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={()=>update({...item,x:.5,y:.5})}>Căn giữa</Button><Button size="sm" variant="outline" onClick={()=>update({...item,x:.5,y:.5,width:.5,height:.2,rotation:0})}>Đặt lại</Button><Button size="sm" variant="outline" onClick={()=>{change({...snapshot,layers:{...snapshot.layers,[side]:snapshot.layers[side].filter(l=>l.id!==item.id)}});setSelected('');}}>Xóa lớp</Button></div>

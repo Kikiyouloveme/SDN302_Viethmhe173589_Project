@@ -217,7 +217,9 @@ const putOrdersIdStatus = async (req, res) => {
     }
     // Giao thành công → bắt đầu đếm 7 ngày đổi/trả; COD coi như đã thu tiền
     if (status === STATUS.DELIVERED) {
-      order.shipping.deliveredAt = new Date().toISOString();
+      // Không ghi đè mốc giao hàng đã có: đơn bị từ chối trả hàng rồi được đánh dấu
+      // giao lại sẽ reset đồng hồ 7 ngày và mất mốc giao thật để đối soát.
+      if (!order.shipping.deliveredAt) order.shipping.deliveredAt = new Date().toISOString();
       if (order.payMethod === 'cod' && order.payStatus !== 'paid') {
         order.payStatus = 'paid';
         order.payment = {

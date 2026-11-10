@@ -53,13 +53,14 @@ export default function ProductPage() {
     return product.variants.filter((v) => v.color === color);
   }, [product, color]);
 
-  // Khi đổi màu: giữ size cũ nếu màu mới cũng có, ngược lại chọn size còn hàng đầu tiên
+  // Khi đổi màu: giữ size cũ nếu màu mới cũng có, ngược lại KHÔNG tự chọn hộ.
+  // Size là quyết định của khách (đổi/trả vì "không vừa size" là lý do phổ biến nhất);
+  // web bán quần áo thật luôn để khách chủ động bấm chọn.
   useEffect(() => {
     if (!sizesForColor.length) return;
     const keep = sizesForColor.find((v) => v.size === size && v.stock > 0);
     if (keep) return;
-    const available = sizesForColor.find((v) => v.stock > 0);
-    setSize(available ? available.size : sizesForColor[0].size);
+    setSize("");
     setQty(1);
   }, [sizesForColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -156,11 +157,12 @@ export default function ProductPage() {
                   <button
                     key={c}
                     onClick={() => setColor(c)}
+                    disabled={soldOut}
                     aria-pressed={color === c}
                     className={cn(
                       "min-h-11 cursor-pointer rounded border px-4 text-sm font-medium transition-colors",
                       color === c ? "border-brand bg-brand/10 text-brand" : "border-border bg-card hover:border-primary",
-                      soldOut && "opacity-45"
+                      soldOut && "cursor-not-allowed opacity-45 line-through"
                     )}
                   >
                     {c}
@@ -224,7 +226,7 @@ export default function ProductPage() {
               ><Plus className="size-4" /></button>
             </span>
             <Button className="flex-1" size="lg" disabled={!canAdd} onClick={addToCart}>
-              <ShoppingBag /> {canAdd ? "Thêm vào giỏ" : "Hết hàng"}
+              <ShoppingBag /> {canAdd ? "Thêm vào giỏ" : size ? "Hết hàng" : "Vui lòng chọn size"}
             </Button>
           </div>
 
